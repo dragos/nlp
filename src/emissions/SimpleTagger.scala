@@ -2,9 +2,9 @@ package emissions
 
 import java.io.File
 import scala.io.Source
-import scala.collection.mutable.HashMap
+import scala.collection.mutable
 
-class SimpleTagger(countsFile: File, inputFile: File) {
+class SimpleTagger(countsFile: File, trainingFile: File) {
 
   private val extract = """(\d+) WORDTAG (.+) (.+)""".r
 
@@ -23,8 +23,9 @@ class SimpleTagger(countsFile: File, inputFile: File) {
       source.close()
   }
 
-  private var bigrams: Map[(String, String), Int] = Map.empty
-  private var trigrams: Map[(String, String, String), Int] = Map.empty
+  private var bigrams: mutable.Map[(String, String), Int] = new mutable.HashMap
+  private var trigrams: mutable.Map[(String, String, String), Int] = new mutable.HashMap
+  loadMultiGrams()
 
   private def loadMultiGrams() {
     val source = Source.fromFile(countsFile)
@@ -41,16 +42,18 @@ class SimpleTagger(countsFile: File, inputFile: File) {
 
   private def addBigram(line: String) {
     //    13 2-GRAM I-GENE STOP
-    val bigramRex = """(\d+) 2-GRAM (*.) (.*)""".r
+    println(line)
+    val bigramRex = """(\d+) 2-GRAM (.*) (.*)""".r
     val bigramRex(count, y1, y2) = line
-    bigrams += ((y1, y2) -> count.toInt)
+    println(count, y1, y2)
+    bigrams((y1, y2)) = count.toInt
   }
 
   private def addTrigram(line: String) {
     //    12451 3-GRAM * O O
-    val bigramRex = """(\d+) 3-GRAM (*.) (.*) (.*)""".r
+    val bigramRex = """(\d+) 3-GRAM (.*) (.*) (.*)""".r
     val bigramRex(count, y1, y2, y3) = line
-    trigrams += ((y1, y2, y3) -> count.toInt)
+    trigrams((y1, y2, y3)) = count.toInt
   }
 
   def biGram(y1: String, y2: String): Int =
@@ -84,7 +87,7 @@ class SimpleTagger(countsFile: File, inputFile: File) {
   private val taggedByWord = tagged.groupBy(_.word)
   private var countTags = Map[Tag, Int]()
 
-  private val inputData = new FilterRare(inputFile)
+  private val inputData = new FilterRare(trainingFile)
 
   tagged collect {
     case Tagged(word, tag, count) => countTags = countTags.updated(tag, countTags.getOrElse(tag, 0) + count)
@@ -116,6 +119,7 @@ class SimpleTagger(countsFile: File, inputFile: File) {
    * Return the maximum likelihood of tag `z` following tags x, y.
    */
   def q(z: String, x: String, y: String): Double = {
+    println(s"${triGram(x, y, z)} / ${biGram(x, y)}")
     triGram(x, y, z).toDouble / biGram(x, y)
   }
 }
